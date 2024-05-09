@@ -1,59 +1,60 @@
-# April Ainsworth
-# Shiny dashboard final project: avocado sales
-
 library(plotly)
 library(shiny)
+library(shinythemes)
 library(dplyr)
 
-avocados <- read.csv("C:/ncf-graduate-school/semester-2/stats-II/final-project/Tidy_Avocado.csv")
+avocados <- read.csv("C:/ncf-graduate-school/semester-2/stats-II/_final-project/Tidy_Avocado.csv")
 
 ui <- fluidPage(
+  theme = shinytheme("journal"),
   
-  titlePanel("Avocado Sales Over Time By Region"),
-  sidebarLayout(
-    sidebarPanel(
-      sliderInput("year",
-                  "Which year:",
-                  min = 2015,
-                  max = 2023,
-                  value = 2015,
-                  sep = "",
-                  animate = animationOptions(loop = FALSE, playButton = "Play")
-      ),
-      
-      selectInput(
-        inputId = "myregion",
-        label = "Which region?",
-        choices = NULL 
-      ),
-      
-      selectInput(
-        inputId = "mycountry",
-        label = "Which country?",
-        choices = NULL 
-      )
+  titlePanel("Avocado Sales: 2015 - 2023"),
+  
+  tabsetPanel(
+    id = "mainTabset",  # Ensure this ID is set for the entire tabsetPanel
+    tabPanel("Intro",
+             mainPanel(
+               div(style = "text-align: center;",
+                img(src = "Avocado-tree-text.jpg", width = 900, height = 600, style = "display: block; margin-left: auto; margin-right: auto;")
+               )
+             )
     ),
-    
-    
-    
-    mainPanel(
-      #plotlyOutput("bubble_plot"),
-      tabsetPanel(
-        id = "tabset",
-        tabPanel("Dataset Source", value = "source", plotlyOutput("bubble_plot"), selected = TRUE),
-        # tabPanel("Dataset Source", value = "source"),
-        tabPanel("Data Dictionary", value = "dictionary", img(src = "data_dictionary.jpg", width = 800, height = 600)),
-        tabPanel("Regions Detail", value = "regions")
-      )
-    )
-  ) # end sidebarLayout
+    tabPanel("US Trends", value = "source",
+             sidebarLayout(
+               sidebarPanel(
+                 sliderInput("year",
+                             "Which year:",
+                             min = 2015,
+                             max = 2023,
+                             value = 2015,
+                             sep = "",
+                             animate = animationOptions(loop = FALSE, playButton = "Play")
+                 ),
+                 selectInput(
+                   inputId = "myregion",
+                   label = "Which region?",
+                   choices = NULL 
+                 ),
+                 selectInput(
+                   inputId = "mycountry",
+                   label = "Which country?",
+                   choices = NULL 
+                 )
+               ),
+               mainPanel(
+                 plotlyOutput("bubble_plot")
+                 # img(src = "data_dictionary.jpg", width = 800, height = 600)
+               )
+             )
+    ),
+    tabPanel("Data Dictionary", value = "dictionary",
+             img(src = "data_dictionary.jpg", width = 800, height = 600, style = "display: block; margin-left: auto; margin-right: auto;")
+    ),
+    tabPanel("Regions Detail", value = "regions")
+  ) # end tabsetPanel
 )
 
 server <- function(session, input, output) {
-  
-  #output$panel <- renderText({
-  #  paste("Current panel: ", input$tabset)
-  #})
   
   filtered_data <- reactive({
     avocado_subset <- subset(avocados, Year == input$year)
@@ -67,7 +68,6 @@ server <- function(session, input, output) {
     return(avocado_subset)
   })
   
-  # Update select input choices using observeEvent()
   observe({
     updateSelectInput(session, "myregion", choices = c("US", unique(avocados$Region)))
   })
@@ -78,7 +78,6 @@ server <- function(session, input, output) {
   })
   
   output$bubble_plot <- renderPlotly({
-    
     plot_ly(data = filtered_data(), 
             type = "scatter",
             mode = "markers",
@@ -86,7 +85,6 @@ server <- function(session, input, output) {
             y = ~Total_Volume,
             color = ~Region,
             size = ~Spec_Volume,
-            # hovertext = ~Packaging,
             config = list(displayModeBar = FALSE)
     ) %>%
       layout(
@@ -94,8 +92,6 @@ server <- function(session, input, output) {
         yaxis = list(range = c(200, 11000000)),
         title = list(text="Avocado Sales Per Year"))
   }) 
-  
 }
 
-# Run the application 
 shinyApp(ui = ui, server = server)
