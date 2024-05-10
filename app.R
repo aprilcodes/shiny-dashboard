@@ -3,14 +3,19 @@ library(shiny)
 library(shinythemes)
 library(dplyr)
 library(ggplot2)
-library(RColorBrewer)
+library(viridis)
+library("colorspace")
 
 avocados <- read.csv("C:/ncf-graduate-school/semester-2/stats-II/_final-project/Tidy_Avocado.csv")
+avocados_summary <- read.csv("C:/ncf-graduate-school/semester-2/data-visualizations/_final_project_avocados/avocados/avocados_2020_summary.csv")
+
+avocados <- avocados %>% filter(Region %in% c("California","West","Plains","Southeast","GreatLakes","Midsouth","Northeast", "SouthCentral")) %>% 
+  filter(!grepl("bag", Packaging, ignore.case = TRUE))
 
 ui <- fluidPage(
   theme = shinytheme("journal"),
   
-  titlePanel("Avocado Sales: 2015 - 2023"),
+  titlePanel("US Avocado Sales: 2015 - 2023"),
   
   tabsetPanel(
     id = "mainTabset",  # Ensure this ID is set for the entire tabsetPanel
@@ -37,11 +42,11 @@ ui <- fluidPage(
                    label = "Which region?",
                    choices = NULL 
                  ),
-                 selectInput(
-                   inputId = "mycountry",
-                   label = "Which country?",
-                   choices = NULL 
-                 )
+                 #selectInput(
+                #   inputId = "mycountry",
+                #   label = "Which country?",
+                #   choices = NULL 
+                # )
                ),
                mainPanel(
                  plotlyOutput("bubble_plot")
@@ -52,27 +57,19 @@ ui <- fluidPage(
     tabPanel("Data Dictionary", value = "dictionary",
              img(src = "data_dictionary.jpg", width = 800, height = 600, style = "display: block; margin-left: auto; margin-right: auto;")
     ),
-    tabPanel("Regions Detail", value = "regions",
+    tabPanel("Regional Trends", value = "regions",
              sidebarLayout(
                sidebarPanel(
-                 sliderInput("year",
-                             "Which year:",
-                             min = 2015,
-                             max = 2023,
-                             value = 2015,
-                             sep = "",
-                             animate = animationOptions(loop = FALSE, playButton = "Play")
-                 ),
                  selectInput(
                    inputId = "myregion",
                    label = "Which region?",
                    choices = NULL 
                  ),
-                 selectInput(
-                   inputId = "mycountry",
-                   label = "Which country?",
-                   choices = NULL 
-                 )
+               #  selectInput(
+                #   inputId = "mycountry",
+                #   label = "Which country?",
+                #   choices = NULL 
+                # )
                ),
                mainPanel(
                  plotOutput("lollipop_plot")
@@ -90,9 +87,9 @@ server <- function(session, input, output) {
       avocado_subset <- subset(avocado_subset, Region == input$myregion)
     }
     
-    if (input$mycountry != "All") {
-      avocado_subset <- subset(avocado_subset, Region == input$myregion)
-    }
+    #if (input$mycountry != "All") {
+    #  avocado_subset <- subset(avocado_subset, Region == input$myregion)
+    #}
     return(avocado_subset)
   })
   
@@ -100,25 +97,31 @@ server <- function(session, input, output) {
     updateSelectInput(session, "myregion", choices = c("US", unique(avocados$Region)))
   })
   
-  observeEvent(input$myregion, {
-    just_regions <- subset(avocados, Region == input$myregion)
-    updateSelectInput(session, "mycountry", choices = c("All", unique(just_regions$Region)))
-  })
+  #observeEvent(input$myregion, {
+  #  just_regions <- subset(avocados, Region == input$myregion)
+  #  updateSelectInput(session, "mycountry", choices = c("All", unique(just_regions$Region)))
+  #})
   
   # cado_colors <- brewer.pal(n = length(unique(filtered_data()$Region)), name = "BrBG")
   
+  
+  
   output$bubble_plot <- renderPlotly({
-    plot_ly(data = filtered_data(), 
+    data = filtered_data()
+    data$Region_numeric <- as.numeric(factor(data$Region))
+    
+    plot_ly(data, 
             type = "scatter",
             mode = "markers",
             x = ~Avg_Prod_Price,
             y = ~Total_Volume,
-            color = ~Region,
+            # color = ~Region,
             size = ~Spec_Volume,
+            #text = ~hover_text,
             #marker = list(
             #  size = ~Spec_Volume,
-            #  color = ~Region,  # Map color to 'Region'
-            colorscale = "Earth",  # Applying the Portland color scale
+            color = ~Region_numeric,  # Map color to 'Region'
+            # colorscale = viridis_scale,  # does viridis need to be called as library()?
             #  showscale = TRUE  # Optionally show the color scale bar
             #),
             config = list(displayModeBar = FALSE)
@@ -126,14 +129,18 @@ server <- function(session, input, output) {
       layout(
         xaxis = list(range = c(0.20, 3.5)),
         yaxis = list(range = c(200, 11000000)),
-        title = list(text="Avocado Sales Per Year"))
+        title = list(text="Avocado Sales Per Region Over Time"))
   }) 
   
   output$lollipop_plot <- renderPlot({
-    ggplot(avocados, aes(x=Year, y=Spec_Volume)) +
-      geom_point(aes(color=factor(Year))) + 
-      geom_segment(aes(x=Year, xend=Year, y=0, yend=Spec_Volume, color=factor(Year))) + 
-      scale_color_brewer(palette="BrBG")
+    avocados_summary$Month <- factor(avocados_summary$Month, levels = 1:12, labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                                                                                     "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), ordered = TRUE)
+    pal <- sequential_hcl(12, "ag_GrnYl")
+    
+    ggplot(avocados_summary, aes(x=Month, y=Average_Spec_Volume)) +
+      geom_point(aes(color=factor(Month)), size = 3) + 
+      geom_segment(aes(x=Month, xend=Month, y=0, yend=Average_Spec_Volume, color=factor(Month)), size = 1) + 
+      scale_color_manual(values = pal)
   }) 
 }
 
