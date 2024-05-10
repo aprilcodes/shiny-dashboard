@@ -2,6 +2,8 @@ library(plotly)
 library(shiny)
 library(shinythemes)
 library(dplyr)
+library(ggplot2)
+library(RColorBrewer)
 
 avocados <- read.csv("C:/ncf-graduate-school/semester-2/stats-II/_final-project/Tidy_Avocado.csv")
 
@@ -50,7 +52,33 @@ ui <- fluidPage(
     tabPanel("Data Dictionary", value = "dictionary",
              img(src = "data_dictionary.jpg", width = 800, height = 600, style = "display: block; margin-left: auto; margin-right: auto;")
     ),
-    tabPanel("Regions Detail", value = "regions")
+    tabPanel("Regions Detail", value = "regions",
+             sidebarLayout(
+               sidebarPanel(
+                 sliderInput("year",
+                             "Which year:",
+                             min = 2015,
+                             max = 2023,
+                             value = 2015,
+                             sep = "",
+                             animate = animationOptions(loop = FALSE, playButton = "Play")
+                 ),
+                 selectInput(
+                   inputId = "myregion",
+                   label = "Which region?",
+                   choices = NULL 
+                 ),
+                 selectInput(
+                   inputId = "mycountry",
+                   label = "Which country?",
+                   choices = NULL 
+                 )
+               ),
+               mainPanel(
+                 plotOutput("lollipop_plot")
+               )
+             )
+    )
   ) # end tabsetPanel
 )
 
@@ -77,6 +105,8 @@ server <- function(session, input, output) {
     updateSelectInput(session, "mycountry", choices = c("All", unique(just_regions$Region)))
   })
   
+  # cado_colors <- brewer.pal(n = length(unique(filtered_data()$Region)), name = "BrBG")
+  
   output$bubble_plot <- renderPlotly({
     plot_ly(data = filtered_data(), 
             type = "scatter",
@@ -85,12 +115,25 @@ server <- function(session, input, output) {
             y = ~Total_Volume,
             color = ~Region,
             size = ~Spec_Volume,
+            #marker = list(
+            #  size = ~Spec_Volume,
+            #  color = ~Region,  # Map color to 'Region'
+            colorscale = "Earth",  # Applying the Portland color scale
+            #  showscale = TRUE  # Optionally show the color scale bar
+            #),
             config = list(displayModeBar = FALSE)
     ) %>%
       layout(
         xaxis = list(range = c(0.20, 3.5)),
         yaxis = list(range = c(200, 11000000)),
         title = list(text="Avocado Sales Per Year"))
+  }) 
+  
+  output$lollipop_plot <- renderPlot({
+    ggplot(avocados, aes(x=Year, y=Spec_Volume)) +
+      geom_point(aes(color=factor(Year))) + 
+      geom_segment(aes(x=Year, xend=Year, y=0, yend=Spec_Volume, color=factor(Year))) + 
+      scale_color_brewer(palette="BrBG")
   }) 
 }
 
