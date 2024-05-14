@@ -1,6 +1,7 @@
 library(plotly)
 library(shiny)
 library(shinythemes)
+library(shinyWidgets)
 library(dplyr)
 library(ggplot2)
 library(viridis)
@@ -50,31 +51,37 @@ ui <- fluidPage(
                ),
                mainPanel(
                  plotlyOutput("bubble_plot")
-                 # img(src = "data_dictionary.jpg", width = 800, height = 600)
                )
              )
     ),
-    tabPanel("Data Dictionary", value = "dictionary",
-             img(src = "data_dictionary.jpg", width = 800, height = 600, style = "display: block; margin-left: auto; margin-right: auto;")
-    ),
-    tabPanel("Regional Trends", value = "regions",
+    tabPanel("Regional Trends", value = "year",
              sidebarLayout(
                sidebarPanel(
+                 switchInput(
+                   inputId = "organic_switch",
+                   label = "What kind of avocados?",
+                   value = FALSE,
+                   onLabel = "Conventional",
+                   offLabel = "Organic"
+                 ),
                  selectInput(
-                   inputId = "myregion",
-                   label = "Which region?",
+                   inputId = "regional_region",
+                   label = "Region?",
                    choices = NULL 
                  ),
-               #  selectInput(
-                #   inputId = "mycountry",
-                #   label = "Which country?",
-                #   choices = NULL 
-                # )
+                 selectInput(
+                   inputId = "regional_packaging",
+                   label = "Packaging Type?",
+                   choices = NULL 
+                 ),
                ),
                mainPanel(
                  plotOutput("lollipop_plot")
                )
              )
+    ),
+    tabPanel("Data Dictionary", value = "dictionary",
+             img(src = "data_dictionary.jpg", width = 800, height = 600, style = "display: block; margin-left: auto; margin-right: auto;")
     )
   ) # end tabsetPanel
 )
@@ -93,8 +100,35 @@ server <- function(session, input, output) {
     return(avocado_subset)
   })
   
+  lollipop_filter <- reactive({
+    lollipop_subset <- avocados_summary # changed from avocados to avocados_summary
+    if (input$regional_region != "All") {
+      lollipop_subset <- subset(lollipop_subset, Region == input$regional_region)
+    }
+    
+    if (input$organic_switch == FALSE) {
+      lollipop_subset <- subset(lollipop_subset, Produce_Type == "organic")
+    } else {
+      lollipop_subset <- subset(lollipop_subset, Produce_Type == "conventional")
+    }
+    
+    if (input$regional_packaging != "All") {
+      lollipop_subset <- subset(lollipop_subset, Packaging == input$regional_packaging)
+    }
+    
+    return(lollipop_subset)
+  })
+  
   observe({
     updateSelectInput(session, "myregion", choices = c("US", unique(avocados$Region)))
+  })
+  
+  observe({
+    updateSelectInput(session, "regional_region", choices = c("All", unique(avocados$Region)))
+  })
+  
+  observe({
+    updateSelectInput(session, "regional_packaging", choices = c("All", unique(avocados$Packaging)))
   })
   
   #observeEvent(input$myregion, {
@@ -133,14 +167,15 @@ server <- function(session, input, output) {
   }) 
   
   output$lollipop_plot <- renderPlot({
-    avocados_summary$Month <- factor(avocados_summary$Month, levels = 1:12, labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+    lollipop_data <- lollipop_filter()
+    lollipop_data$Month <- factor(lollipop_data$Month, levels = 1:12, labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
                                                                                      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), ordered = TRUE)
     pal <- sequential_hcl(12, "ag_GrnYl")
     
-    ggplot(avocados_summary, aes(x=Month, y=Average_Spec_Volume)) +
+    ggplot(lollipop_data, aes(x=Month, y=Average_Spec_Volume)) +
       geom_point(aes(color=factor(Month)), size = 3) + 
       geom_segment(aes(x=Month, xend=Month, y=0, yend=Average_Spec_Volume, color=factor(Month)), size = 1) + 
-      scale_color_manual(values = pal)
+      scale_color_manual(values = pal) + labs(color = "Month", y = "Total Sales Volume (Lbs)", title = "Year 2020 Avocado Sales")
   }) 
 }
 
