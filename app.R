@@ -1,7 +1,3 @@
-# Install and load the DT package
-if (!require(DT)) install.packages("DT")
-library(DT)
-
 library(plotly)
 library(shiny)
 library(shinythemes)
@@ -10,6 +6,7 @@ library(dplyr)
 library(ggplot2)
 library(viridis)
 library(colorspace)
+library(DT)
 
 avocados <- read.csv("Tidy_Avocado.csv")
 avocados_summary <- read.csv("avocados_2020_summary.csv")
@@ -20,7 +17,7 @@ avocados <- avocados %>% filter(Region %in% c("California","West","Plains","Sout
 ui <- fluidPage(
   theme = shinytheme("journal"),
   
-  titlePanel("US Avocado Sales: 2015 - 2023"),
+  titlePanel("US Hass Avocado Sales: 2015 - 2023"),
   
   tabsetPanel(
     id = "mainTabset",
@@ -46,6 +43,14 @@ ui <- fluidPage(
                  conditionalPanel(
                    condition = "input.show_price == true",  # Show text when checkbox is checked
                    p("( * = Highest Gross Revenue)", style = "color: red;")
+                 ),
+                 checkboxInput("show_freight", "Show Freight Calculator", value = FALSE),  # Add freight calculator toggle
+                 conditionalPanel(
+                   condition = "input.show_freight == true",
+                   numericInput("distance", "Distance To Market (miles):", value = 0, min = 0),
+                   numericInput("freight_cost", "Freight Cost Per Mile:", value = 0.67, min = 0),
+                   # p("Round-Trip Freight Cost:"),
+                   verbatimTextOutput("break_even")
                  )
                ),
                mainPanel(
@@ -161,11 +166,10 @@ server <- function(session, input, output) {
         title = list(text = "Avocado Sales Per Region Over Time")
       )
     
-    # Conditionally add mean Avg_Prod_Price as annotations
     if (input$show_price) {
       p <- p %>%
         add_annotations(
-          text = ~Price_Label,  # Use the label with asterisk if applicable
+          text = ~Price_Label,  # show asterisk if applicable
           x = ~Region,
           y = ~Summarized_Volume,
           xanchor = "center",
@@ -186,21 +190,26 @@ server <- function(session, input, output) {
       top_n(1, wt = Average_Spec_Volume) %>%
       ungroup()
     
-    lollipop_data$Month <- factor(lollipop_data$Month, levels = 1:12, labels = c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
-                                                                                 "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"), ordered = TRUE)
+    top_lollipop_data$Month <- factor(top_lollipop_data$Month, levels = rev(1:12), labels = rev(c("Jan", "Feb", "Mar", "Apr", "May", "Jun", 
+                                                                                                  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")), ordered = TRUE)
     pal <- sequential_hcl(12, "ag_GrnYl")
     
     ggplot(top_lollipop_data, aes(x = Month, y = Average_Spec_Volume)) +
       geom_point(aes(color = factor(Month)), size = 3) + 
       geom_segment(aes(x = Month, xend = Month, y = 0, yend = Average_Spec_Volume, color = factor(Month)), size = 1) + 
       scale_color_manual(values = pal) + 
-      labs(color = "Month", y = "Total Sales Volume (Lbs)", title = "Year 2020 Avocado Sales")
+      labs(color = "Month", y = "Total Sales Volume (Lbs)", title = "Year 2020 Avocado Sales") + coord_flip() + theme(legend.position = "None")
   }) 
-  
+
   output$data_table <- renderDT({
     datatable(avocados, options = list(pageLength = 10, autoWidth = TRUE))
+  })
+  
+  output$break_even <- renderText({
+    req(input$distance, input$freight_cost)  # Ensure all inputs are provided
+    break_even_point <- (input$distance * input$freight_cost * 2)
+    paste("Round-Trip Freight Cost:", round(break_even_point, 2))
   })
 }
 
 shinyApp(ui = ui, server = server)
-
